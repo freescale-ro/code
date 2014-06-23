@@ -1,9 +1,9 @@
 CC=gcc
 CFLAGS= -I /usr/local/ssl/include  -c -Wall
 LDFLAGS= -L /usr/local/ssl/lib -lcrypto
-SOURCES=rsa.c
+SOURCES=pointers.c
 OBJECTS=$(SOURCES:.c=.o)
-EXECUTABLE=rsa
+EXECUTABLE=pointers
 
 all: $(SOURCES) $(EXECUTABLE)
 	
