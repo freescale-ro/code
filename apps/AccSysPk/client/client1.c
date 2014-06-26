@@ -14,25 +14,28 @@
 
 /*Headers to be included*/
 #include <time.h>
-#include <openssl/sha.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <termios.h>
+/*system includes*/
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+/*Net includes*/
+#include <netinet/in.h>
+#include <netdb.h>
+/*OpenSSL Includes*/
 #include <openssl/pem.h>	
+#include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <openssl/rsa.h>
 #include <openssl/evp.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <sys/ioctl.h>
 
 /*Global variables*/
 int padding = RSA_PKCS1_PADDING;
@@ -99,7 +102,8 @@ int main(){
     	char s1[1024]="";
     	char s2[1024]="";
     	unsigned char send1[1024],send_data[1024],recv_data[1024];
-    	struct hostent *host;
+    	
+	struct hostent *host;
     	struct sockaddr_in server_addr;
 	
 	/* Get Server Public Key From local file */
@@ -146,142 +150,137 @@ int main(){
 	
 	fflush(stdout);
 	/*Main function that poll the KeyBoard that take the user and password*/
-	while (STOP==0){
-		while(1){
-			/**/ 
-			printf("\nEnter your userID ,followed by SPACE key, and your password or press 'q' to QUIT : \n");
-			int fd = open("/dev/tty0", O_RDONLY);
-			if(fd == -1){
-				/*Check if the keyboard  could be open*/
-				printf("Unable to open /dev/tty0");
-			} 
-			/*Read until Escape is made [ENTER]*/
-			while ((res=read(fd,send1,255)) == 0){
-			 /*Print content - buffer and size of the buffer*/
-				if(res > 0){
-					send1[res]=0;
-					printf("%s:%d",send1,res);
-					if(send1[sizeof(send1)]=='\n') break;
-				}                                              
-			}
-			char *tmp=strchr(send1,' ');
-
-			/*Split user and password*/
-			if (tmp !=NULL){
-				*tmp='\0';
-				strcpy(s1,send1);
-				strcpy(s2,tmp+1);
-			}
-			/*Copy user into SRC variable*/
-
-			strcpy(src,s1);
-			/*Get size of string*/
-			size_t length = sizeof(s2);
-			int d=sizeof(s2);
-			printf("\nlength:%d",d);
-
-			char hash[SHA_DIGEST_LENGTH];
-			int n;
-			/*Print PASSWORD*/
-			/*print_data();*/
-			for(n=0;n<10;n++)
-				printf("%02x ",s2[n]);
-			/*Compute HASH*/				
-			SHA1(s2,length,hash);
-			printf("\ns2 : %s",s2);
-			//concatenare user + hash
-			strcat(src,hash);	
-			/*To move local variables at function begining*/	
-			char result[10];
-			char decryptiontmp[1024]="";
-			int k;
-			printf("\n");
-			/*Prepare Print function print_data()*/
-			for( k=0 ; k<20 ; k++ ){
-				sprintf(result,"%x",src[k]);
-				strcat(decryptiontmp,result);	
-			}
-			
-			unsigned char *decryptionhex=(unsigned char*)decryptiontmp;
-			printf("UserID+Password : %s",decryptionhex);
-			
-			/*Get Local Time*/
-			time_t rawtime;
-			struct tm *timeinfo;
-			char buffer[128];
-			time(&rawtime);
-			
-			timeinfo=localtime(&rawtime);
-			strftime(buffer,128,"%T",timeinfo);
-			printf("\n\nTime: %s",buffer);
-
-			/*Concatenate User / HASH(Password) / Time */		
-			strcat(src,b);
-			strcat(src,buffer);
-			printf("\n\nUser+Hash+Time: ");
-			strcpy(send_data,src);
-
-			int i;
-			printf("\n");
-			/*Use print function*/	
-			for(i=0;i<32;i++)
-				printf("%02x ",send_data[i]);
-			
-			/*Move the variables as variables of the function*/				
-			unsigned char encrypted[1024]={};
-			unsigned char decrypted[1024]={};
-
-			int encrypted_length= public_encrypt(send_data,strlen(send_data),publicKey,encrypted);
-			if(encrypted_length == -1){
-				printLastError("Public Encrypt failed ");
-				exit(0);
-			}
-			/*Move variables at function start*/
-			int j;
-			printf("\n\nEncrypted message sent to server : \n");
-			/*Use print function */
-			for(j=0;j<32;j++)
-				printf("%02x ",encrypted[j]);
-			/*Send data to server*/	
-			send(sock,encrypted,encrypted_length, 0); 	
-			/*Get response from server*/
-			bytes_recieved = recv(sock,recv_data,256,0);
-			/*Insert end caracter - this may not be required*/
-			recv_data[bytes_recieved] = '\0';
-			/*If server respond with null data than socket will be closed*/
-			if (recv_data==0){
-				close(sock);
-				break;
-			}
-			else{
-				int k = 0;
-				int decrypted_length = 0;
-				printf("\n\nConfirmed message from server : \n");
-				/*Use Print function*/		
-				for(k=0;k<32;k++)
-					printf("%02x ",recv_data[k]);
-				/*Decrpt received data with private key*/
-				decrypted_length=private_decrypt(recv_data,256,privateKey,decrypted);
-				printf("\n\nDecrypted confirmed message : %s\n",decrypted);
-				/*Validate / Invalidate*/
-				if(strcmp(decrypted,"User Not Granted")==0){
-					t=t+1;
-					int ok=0;
-					do{
-					/*If the */
-						if (t==3){
-							printf("\nYou entered the wrong password three times so WAIT 30 s\n");
-							sleep(10); 
-						  	t=0;
-						}	
-					}/*end of do */
-					/*Need to check if this is mandatory*/
-					while(ok=0);
-						printf("\nWrong passwords: %d",t);	
-				}  
-			}  
+	while(1){
+		/**/ 
+		printf("\nEnter your userID ,followed by SPACE key, and your password or press 'q' to QUIT : \n");
+		int fd = open("/dev/tty0", O_RDONLY);
+		if(fd == -1){
+			/*Check if the keyboard  could be open*/
+			printf("Unable to open /dev/tty0");
+		} 
+		/*Read until Escape is made [ENTER]*/
+		while ((res=read(fd,send1,255)) == 0){
+		 /*Print content - buffer and size of the buffer*/
+			if(res > 0){
+				send1[res]=0;
+				printf("%s:%d",send1,res);
+				if(send1[sizeof(send1)]=='\n') break;
+			}                                              
 		}
+		char *tmp=strchr(send1,' ');
+		/*Split user and password*/
+		if (tmp !=NULL){
+			*tmp='\0';
+			strcpy(s1,send1);
+			strcpy(s2,tmp+1);
+		}
+		/*Copy user into SRC variable*/
+		strcpy(src,s1);
+		/*Get size of string*/
+		size_t length = sizeof(s2);
+		int d=sizeof(s2);
+		printf("\nlength:%d",d);
+
+		char hash[SHA_DIGEST_LENGTH];
+		int n;
+		/*Print PASSWORD*/
+		/*print_data();*/
+		for(n=0;n<10;n++)
+			printf("%02x ",s2[n]);
+		/*Compute HASH*/				
+		SHA1(s2,length,hash);
+		printf("\ns2 : %s",s2);
+		//concatenare user + hash
+		strcat(src,hash);	
+		/*To move local variables at function begining*/	
+		char result[10];
+		char decryptiontmp[1024]="";
+		int k;
+		printf("\n");
+		/*Prepare Print function print_data()*/
+		for( k=0 ; k<20 ; k++ ){
+			sprintf(result,"%x",src[k]);
+			strcat(decryptiontmp,result);	
+		}
+			
+		unsigned char *decryptionhex=(unsigned char*)decryptiontmp;
+		printf("UserID+Password : %s",decryptionhex);
+		/*Get Local Time*/
+		time_t rawtime;
+		struct tm *timeinfo;
+		char buffer[128];
+		time(&rawtime);
+		
+		timeinfo=localtime(&rawtime);
+		strftime(buffer,128,"%T",timeinfo);
+		printf("\n\nTime: %s",buffer);
+
+		/*Concatenate User / HASH(Password) / Time */		
+		strcat(src,b);
+		strcat(src,buffer);
+		printf("\n\nUser+Hash+Time: ");
+		strcpy(send_data,src);
+
+		int i;
+		printf("\n");
+		/*Use print function*/	
+		for(i=0;i<32;i++)
+			printf("%02x ",send_data[i]);
+			
+		/*Move the variables as variables of the function*/				
+		unsigned char encrypted[1024]={};
+		unsigned char decrypted[1024]={};
+
+		int encrypted_length= public_encrypt(send_data,strlen(send_data),publicKey,encrypted);
+		if(encrypted_length == -1){
+			printLastError("Public Encrypt failed ");
+			exit(0);
+		}
+		/*Move variables at function start*/
+		int j;
+		printf("\n\nEncrypted message sent to server : \n");
+		/*Use print function */
+		for(j=0;j<32;j++)
+			printf("%02x ",encrypted[j]);
+		/*Send data to server*/	
+		send(sock,encrypted,encrypted_length, 0); 	
+		/*Get response from server*/
+		bytes_recieved = recv(sock,recv_data,256,0);
+		/*Insert end caracter - this may not be required*/
+		recv_data[bytes_recieved] = '\0';
+		/*If server respond with null data than socket will be closed*/
+		if (recv_data==0){
+			close(sock);
+			break;
+		}
+		else{
+			int k = 0;
+			int decrypted_length = 0;
+			printf("\n\nConfirmed message from server : \n");
+			/*Use Print function*/		
+			for(k=0;k<32;k++)
+				printf("%02x ",recv_data[k]);
+			/*Decrpt received data with private key*/
+			decrypted_length=private_decrypt(recv_data,256,privateKey,decrypted);
+			printf("\n\nDecrypted confirmed message : %s\n",decrypted);
+			/*Validate / Invalidate*/
+			if(strcmp(decrypted,"User Not Granted")==0){
+				t=t+1;
+				int ok=0;
+				do{
+				/*If the */
+					if (t==3){
+						printf("\nYou entered the wrong password three times so WAIT 30 s\n");
+						sleep(10); 
+					  	t=0;
+					}	
+				}/*end of do */
+				/*Need to check if this is mandatory*/
+				while(ok=0);
+				printf("\nWrong passwords: %d",t);	
+			}  
+		}  
+	}
 	close(sock);
 	return 0;
-	}/*End of socket while*/
 }
